@@ -225,6 +225,176 @@ def fabricar_word(texto_ia: str, contexto_destino: str) -> io.BytesIO:
     return buffer_doc
 
 
+def fabricar_pdf(texto_ia: str, contexto_destino: str) -> io.BytesIO:
+    buffer_pdf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer_pdf,
+        pagesize=letter,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm
+    )
+
+    styles = getSampleStyleSheet()
+
+    estilo_meta = ParagraphStyle(
+        'MetaHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#787878'),
+        spaceAfter=4
+    )
+
+    estilo_alumno = ParagraphStyle(
+        'AlumnoHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor('#5A5A5A'),
+        spaceAfter=14
+    )
+
+    estilo_h1 = ParagraphStyle(
+        'H1Custom',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor('#182B49'),
+        spaceBefore=12,
+        spaceAfter=6
+    )
+
+    estilo_h2 = ParagraphStyle(
+        'H2Custom',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor('#2980B9'),
+        spaceBefore=10,
+        spaceAfter=4
+    )
+
+    estilo_h3 = ParagraphStyle(
+        'H3Custom',
+        parent=styles['Heading3'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor('#1E5078'),
+        spaceBefore=8,
+        spaceAfter=3
+    )
+
+    estilo_cuerpo = ParagraphStyle(
+        'BodyCustom',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#2A2A2A'),
+        spaceAfter=4
+    )
+
+    estilo_bullet = ParagraphStyle(
+        'BulletCustom',
+        parent=estilo_cuerpo,
+        leftIndent=14,
+        spaceAfter=3
+    )
+
+    estilo_celda = ParagraphStyle(
+        'CellCustom',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#333333')
+    )
+
+    historia = []
+
+    tag = f"ACTIVIDAD DIDÁCTICA ADAPTADA • CONTEXTO: {contexto_destino.upper()}"
+    historia.append(Paragraph(tag, estilo_meta))
+    subraya = "_" * 28
+    historia.append(Paragraph(f"Nombre del estudiante: {subraya}   Fecha: ___________", estilo_alumno))
+    historia.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor('#D0D7DE'), spaceAfter=10))
+
+    texto_reparado = re.sub(r"\n\s*\|\s*", " | ", texto_ia)
+    lineas = [l.strip() for l in texto_reparado.split("\n") if l.strip()]
+
+    i = 0
+    total = len(lineas)
+
+    while i < total:
+        linea_raw = lineas[i]
+        linea_str = limpiar_markdown_residual(linea_raw)
+
+        if not linea_str or linea_str.lower().startswith(("foto:", "pie de foto", "imagen:")):
+            i += 1
+            continue
+
+        if linea_str in ("---", "***", "___"):
+            historia.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E2E8F0'), spaceAfter=6, spaceBefore=6))
+            i += 1
+            continue
+
+        if "|" in linea_raw and not linea_raw.startswith(("#", "Respuestas:", "Respuesta:")):
+            filas_tabla = []
+            while i < total and "|" in lineas[i] and not lineas[i].startswith(("#", "Respuestas:", "Respuesta:")):
+                fila_actual = lineas[i]
+                if not re.match(r"^\|?(\s*:?-+:?\s*\|?)+$", fila_actual):
+                    celdas = [c.strip() for c in fila_actual.strip("|").split("|") if c.strip()]
+                    if len(celdas) >= 2:
+                        filas_tabla.append([
+                            Paragraph(re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", celdas[0]), estilo_celda),
+                            Paragraph(re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", celdas[1]), estilo_celda)
+                        ])
+                i += 1
+
+            if filas_tabla:
+                t = Table(filas_tabla, colWidths=[5 * cm, 12 * cm])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                    ('BOX', (0, 0), (-1, -1), 0.8, colors.HexColor('#CBD5E1')),
+                    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ]))
+                historia.append(t)
+                historia.append(Spacer(1, 0.3 * cm))
+            continue
+
+        if re.match(r"^#\s+", linea_raw):
+            texto = re.sub(r"^#+\s*", "", linea_str).strip()
+            historia.append(Paragraph(texto, estilo_h1))
+        elif re.match(r"^##\s+", linea_raw):
+            texto = re.sub(r"^#+\s*", "", linea_str).strip()
+            historia.append(Paragraph(texto, estilo_h2))
+        elif re.match(r"^###\s+", linea_raw):
+            texto = re.sub(r"^#+\s*", "", linea_str).strip()
+            historia.append(Paragraph(texto, estilo_h3))
+        elif linea_raw.startswith(("- ", "• ", "* ", "– ")):
+            contenido = re.sub(r"^(\*|-|•|–)\s+", "", linea_str)
+            contenido_html = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", contenido)
+            historia.append(Paragraph(f"• {contenido_html}", estilo_bullet))
+        else:
+            contenido_html = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", linea_str)
+            historia.append(Paragraph(contenido_html, estilo_cuerpo))
+
+        i += 1
+
+    doc.build(historia)
+    buffer_pdf.seek(0)
+    return buffer_pdf
+
 
 @app.get("/", response_class=HTMLResponse)
 async def interfaz_web():
@@ -809,7 +979,7 @@ async def interfaz_web():
                         <input type="text" id="destino" name="destino" placeholder="Ej: Lima (Perú), Buenos Aires, Tokio..." required>
                     </div>
 
-                   <div class="grid-selectors form-field" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <div class="grid-selectors form-field" style="grid-template-columns: 1fr 1fr 1fr;">
                         <div>
                             <label class="field-caption" for="modo">Modo</label>
                             <select id="modo" name="modo">
@@ -872,7 +1042,7 @@ async def interfaz_web():
                     </div>
 
                     <button type="submit" class="btn-cta">
-                        <span> Generar Ficha Didáctica</span>
+                        <span>⚡ Generar Ficha Didáctica</span>
                     </button>
                 </form>
             </div>
@@ -882,7 +1052,7 @@ async def interfaz_web():
         <div class="loader-screen" id="loadingOverlay">
             <div class="spinner"></div>
             <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 6px;">Realizando Cirugía Léxica...</h2>
-            <p style="font-size: 13.5px; color: #a4c0cd;">Analizando la imagen, transponiendo cultura y maquetando el Word.</p>
+            <p style="font-size: 13.5px; color: #a4c0cd;">Analizando la imagen, transponiendo cultura y maquetando el documento.</p>
         </div>
 
         <script>
@@ -936,7 +1106,6 @@ async def adaptar_foto(
         img.save(buffer_jpg, format="JPEG", quality=85)
         bytes_optimizados = buffer_jpg.getvalue()
 
-        # Condicional de Glosario Minimalista
         if incluir_glosario:
             instruccion_glosario = """
         6. EXCEPCIÓN DE ADICIÓN - GLOSARIO PEDAGÓGICO MINIMALISTA:
@@ -953,7 +1122,6 @@ async def adaptar_foto(
         else:
             instruccion_glosario = ""
 
-        # Construcción dinámica de actividades pedagógicas
         bloques_ejercicios = []
         bloques_solucionario = []
 
@@ -1026,7 +1194,6 @@ async def adaptar_foto(
         else:
             instruccion_ejercicios = ""
 
-        # CALIBRACIÓN DINÁMICA DEL MCER EN EL BACKEND
         if nivel == "C1":
             pauta_mcer = (
                 "NIVEL MCER C1 (Dominio Operativo Eficaz): Adapta el texto y las actividades "
@@ -1114,7 +1281,6 @@ async def adaptar_foto(
             contents=partes_contenido,
             config=configuracion
         )
-
 
         texto_generado = None
         if respuesta.text:
