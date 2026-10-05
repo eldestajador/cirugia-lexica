@@ -1106,6 +1106,7 @@ async def adaptar_foto(
         img.save(buffer_jpg, format="JPEG", quality=85)
         bytes_optimizados = buffer_jpg.getvalue()
 
+        # Condicional de Glosario Minimalista
         if incluir_glosario:
             instruccion_glosario = """
         6. EXCEPCIÓN DE ADICIÓN - GLOSARIO PEDAGÓGICO MINIMALISTA:
@@ -1122,6 +1123,7 @@ async def adaptar_foto(
         else:
             instruccion_glosario = ""
 
+        # Construcción dinámica o PROHIBICIÓN estricta de actividades
         bloques_ejercicios = []
         bloques_solucionario = []
 
@@ -1179,7 +1181,7 @@ async def adaptar_foto(
             texto_ejercicios = "\n".join(bloques_ejercicios)
             texto_solucionario = "\n".join(bloques_solucionario)
             instruccion_ejercicios = f"""
-        7. EXCEPCIÓN DE ADICIÓN - ACTIVIDADES DIDÁCTICAS Y SOLUCIONARIO:
+        7. ACTIVIDADES DIDÁCTICAS Y SOLUCIONARIO:
            - Tras el texto didáctico (y tras el glosario si fue solicitado), agrega el encabezado:
              ## ACTIVIDADES DE APRENDIZAJE
            {texto_ejercicios}
@@ -1192,8 +1194,14 @@ async def adaptar_foto(
            {texto_solucionario}
             """
         else:
-            instruccion_ejercicios = ""
+            instruccion_ejercicios = """
+        7. PROHIBICIÓN ABSOLUTA DE ACTIVIDADES O EJERCICIOS:
+           - El docente NO ha solicitado actividades pedagógicas ni ejercicios.
+           - QUEDA ESTRICTAMENTE PROHIBIDO inventar, adaptar o transcribir ejercicios, preguntas, comprensiones, incisos gramaticales o solucionarios, incluso si aparecen en la imagen original.
+           - El documento DEBE TERMINAR OBLIGATORIAMENTE tras el glosario (o tras el texto adaptado si no se marcó glosario).
+            """
 
+        # Calibración dinámica del MCER
         if nivel == "C1":
             pauta_mcer = (
                 "NIVEL MCER C1 (Dominio Operativo Eficaz): Adapta el texto y las actividades "
@@ -1213,35 +1221,37 @@ async def adaptar_foto(
             regla_lexico = f"1. MANTÉN EL LÉXICO ADECUADO: No excedas la complejidad léxica correspondiente al nivel {nivel}."
 
         prompt_didactico = f"""
-        [CONTEXTO DE ANÁLISIS: Material didáctico extraído de un manual escolar de lengua española (ELE) sobre cartas de reclamación turística y quejas formales de consumidores. Todo el contenido es ficticio y con propósitos estrictamente pedagógicos y de análisis gramatical.]
+        [CONTEXTO DE ANÁLISIS: Material didáctico extraído de un manual escolar de lengua española (ELE) sobre cartas de reclamación turística, diálogos cotidianos o situaciones comunicativas. Todo el contenido es ficticio y con propósitos estrictamente pedagógicos y de análisis gramatical.]
 
         Eres un experto lingüista y diseñador de materiales didácticos de Español como Lengua Extranjera (ELE).
-        Tu misión consta de dos partes:
-        1. Adaptar didácticamente el texto de queja/reclamación de la imagen al contexto cultural de: '{destino}'.
-        2. Generar inmediatamente después del texto adaptado todos los complementos pedagógicos solicitados (glosario y baterías de ejercicios con su correspondiente solucionario).
+        Tu misión consta de:
+        1. Adaptar didácticamente el texto de la imagen al contexto cultural de: '{destino}'.
+        2. Generar inmediatamente después del texto adaptado ÚNICAMENTE los complementos pedagógicos que hayan sido explícitamente solicitados.
 
         REGLAS DE REESCRITURA QUIRÚRGICA:
         {regla_lexico}
-        2. ADAPTACIÓN DE REFERENTES: Modifica nombres de personas, ciudades, barrios, portales de internet y moneda al contexto real de {destino}.
+        2. ADAPTACIÓN ONOMÁSTICA Y CULTURAL OBLIGATORIA (CERO EXCEPCIONES):
+           - Debes reemplazar OBLIGATORIAMENTE TODOS los nombres propios de personas (incluidos nombres como Alba, Mario, Elena, etc.) por nombres comunes y auténticos del contexto meta ({destino}). Si el destino no es hispanohablante (ej. Utah, Reino Unido, etc.), utiliza nombres anglófonos u originarios de dicha región para TODOS los personajes.
+           - Modifica sistemáticamente ciudades, lagos, tiendas, campamentos, barrios, medios de transporte y moneda al contexto real de {destino}.
         3. MICROVARIACIONES ESTRUCTURALES:
-           - Conserva la misma historia, las mismas quejas y el mismo orden de los hechos párrafo por párrafo.
-           - Para no reproducir texto continuo idéntico de la prensa, aplica ligeras variaciones sintácticas simples.
+           - Conserva la misma historia, las mismas ideas y el mismo orden de los hechos párrafo por párrafo o turno por turno de diálogo.
+           - Para no reproducir texto continuo idéntico de manuales editoriales, aplica ligeras variaciones sintácticas simples.
            - El resultado debe sentirse prácticamente idéntico al original para el estudiante, pero con una redacción superficialmente diferenciada.
 
         CRITERIOS LINGÜÍSTICOS:
         1. MODO: {modo.upper()}. Conserva la morfología, sintaxis meta y carga léxica original, sustituyendo con precisión enciclopédica los referentes socioculturales, geográficos y fácticos por sus equivalentes en {destino}.
         2. {pauta_mcer}
-        3. ESTRUCTURA: Respeta párrafos y viñetas del original. No agregues introducciones, despedidas ni comentarios de chat.
+        3. ESTRUCTURA: Respeta párrafos y turnos de diálogo del original. No agregues introducciones, despedidas ni comentarios de chat.
         4. LÓGICA COHESIVA: Asegúrate de que las fechas, altitudes, distancias y climas correspondan fielmente a la realidad del lugar de destino en {destino}.
 
-        SECCIONES COMPLEMENTARIAS OBLIGATORIAS:
+        SECCIONES COMPLEMENTARIAS:
         {instruccion_glosario}
         {instruccion_ejercicios}
 
         REGLA DE SALIDA LIMPIA (CRÍTICO):
         - Comienza DIRECTAMENTE en el primer carácter con '# TÍTULO DEL TEXTO ADAPTADO'.
-        - PROHIBIDO incluir pensamientos o monólogos internos.
-        - Debes incluir en un solo flujo continuo: el texto adaptado, luego el glosario (si se especificó) y las actividades de aprendizaje con su solucionario (si se especificaron).
+        - PROHIBIDO incluir pensamientos, notas previas o monólogos internos.
+        - Salida estricta: incluye el texto adaptado y, si fueron explícitamente activados, el glosario y las actividades. Si no se solicitaron actividades, concluye el documento inmediatamente.
         """
         
         partes_contenido = [
