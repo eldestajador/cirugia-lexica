@@ -8,6 +8,18 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from google import genai
 from google.genai import types
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    HRFlowable
+)
+from reportlab.lib.units import cm
 
 app = FastAPI(title="Cirugía Léxica ELE")
 
@@ -211,6 +223,7 @@ def fabricar_word(texto_ia: str, contexto_destino: str) -> io.BytesIO:
     doc.save(buffer_doc)
     buffer_doc.seek(0)
     return buffer_doc
+
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -796,7 +809,7 @@ async def interfaz_web():
                         <input type="text" id="destino" name="destino" placeholder="Ej: Lima (Perú), Buenos Aires, Tokio..." required>
                     </div>
 
-                    <div class="grid-selectors form-field">
+                   <div class="grid-selectors form-field" style="grid-template-columns: 1fr 1fr 1fr;">
                         <div>
                             <label class="field-caption" for="modo">Modo</label>
                             <select id="modo" name="modo">
@@ -813,6 +826,13 @@ async def interfaz_web():
                                 <option value="B1">B1</option>
                                 <option value="B2">B2</option>
                                 <option value="C1">C1</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-caption" for="formato">Formato</label>
+                            <select id="formato" name="formato">
+                                <option value="docx" selected>Word (.docx)</option>
+                                <option value="pdf">Documento PDF</option>
                             </select>
                         </div>
                     </div>
@@ -852,7 +872,7 @@ async def interfaz_web():
                     </div>
 
                     <button type="submit" class="btn-cta">
-                        <span>⚡ Generar Ficha en Word (.docx)</span>
+                        <span> Generar Ficha Didáctica</span>
                     </button>
                 </form>
             </div>
@@ -895,6 +915,7 @@ async def adaptar_foto(
     destino: str = Form(...),
     modo: str = Form("quirurgico"),
     nivel: str = Form("AUTO"),
+    formato: str = Form("docx"),
     incluir_glosario: bool = Form(False),
     ejercicios_n1: bool = Form(False),
     ejercicios_n2: bool = Form(False),
@@ -1094,6 +1115,7 @@ async def adaptar_foto(
             config=configuracion
         )
 
+
         texto_generado = None
         if respuesta.text:
             texto_generado = respuesta.text
@@ -1117,14 +1139,22 @@ async def adaptar_foto(
                 detail="La API no devolvió contenido de texto para esta imagen."
             )
 
-        buffer_docx = fabricar_word(texto_generado, destino)
+        nombre_base = f"Actividad_ELE_{destino.replace(' ', '_')}"
 
-        nombre_archivo = f"Actividad_ELE_{destino.replace(' ', '_')}.docx"
-        return StreamingResponse(
-            buffer_docx,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'}
-        )
+        if formato == "pdf":
+            buffer_pdf = fabricar_pdf(texto_generado, destino)
+            return StreamingResponse(
+                buffer_pdf,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{nombre_base}.pdf"'}
+            )
+        else:
+            buffer_docx = fabricar_word(texto_generado, destino)
+            return StreamingResponse(
+                buffer_docx,
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={"Content-Disposition": f'attachment; filename="{nombre_base}.docx"'}
+            )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error durante el procesamiento didáctico: {str(e)}")
