@@ -1089,7 +1089,7 @@ async def adaptar_foto(
         )
 
         respuesta = cliente_gemini.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=partes_contenido,
             config=configuracion
         )
