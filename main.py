@@ -1262,6 +1262,7 @@ async def adaptar_foto(
         configuracion = types.GenerateContentConfig(
             temperature=0.2,
             max_output_tokens=8192,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
             safety_settings=[
                 types.SafetySetting(
                     category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -1292,15 +1293,27 @@ async def adaptar_foto(
             config=configuracion
         )
 
-        texto_generado = None
-        if respuesta.text:
-            texto_generado = respuesta.text
-        elif respuesta.candidates and len(respuesta.candidates) > 0:
+        texto_generado = ""
+        if respuesta.candidates and len(respuesta.candidates) > 0:
             candidate = respuesta.candidates[0]
             if candidate.content and candidate.content.parts:
-                partes_texto = [p.text for p in candidate.content.parts if hasattr(p, "text") and p.text]
-                if partes_texto:
-                    texto_generado = "".join(partes_texto)
+                partes_utiles = []
+                for p in candidate.content.parts:
+                    # Ignorar bloques de pensamiento interno (thought)
+                    if getattr(p, "thought", False):
+                        continue
+                    if hasattr(p, "text") and p.text:
+                        partes_utiles.append(p.text)
+                if partes_utiles:
+                    texto_generado = "".join(partes_utiles)
+
+        # Respaldo si no vino segmentado
+        if not texto_generado and respuesta.text:
+            texto_generado = respuesta.text
+
+        # Limpiar cualquier residuo de pensamiento que empiece antes del título
+        if "#" in texto_generado:
+            texto_generado = texto_generado[texto_generado.find("#"):]
             
             if not texto_generado:
                 motivo = getattr(candidate, "finish_reason", "DESCONOCIDO")
